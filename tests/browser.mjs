@@ -39,9 +39,9 @@ try{
  assert.match(await page.locator('#status').innerText(),/Добавлено рисунков: 2/);
  assert.equal(await page.locator('.design-row').count(),2);
  await page.locator('#size').selectOption('m37');
- await page.locator('#zoom').fill('135');
+ await page.locator('#zoom').evaluate(el=>{el.value='135';el.dispatchEvent(new Event('input',{bubbles:true}))});
  await page.locator('#faceFill').selectOption('color');
- await page.locator('#fillColor').fill('#123456');
+ await page.locator('#fillColor').evaluate(el=>{el.value='#123456';el.dispatchEvent(new Event('input',{bubbles:true}))});
  await page.locator('#copies').fill('3');
  await page.locator('#copies').dispatchEvent('change');
  assert.match(await page.locator('#sheetInfo').innerText(),/всего значков: 4/);
