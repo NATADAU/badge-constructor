@@ -441,8 +441,10 @@ async function saveProject(){
  try{
   const items=[];
   for(const item of state.items){
-   const blob=await fetch(item.url).then(r=>{if(!r.ok)throw Error('Не удалось получить изображение');return r.blob()});
-   items.push({name:item.name,image:await fileToDataURL(blob),zoom:item.zoom,x:item.x,y:item.y,
+   // Restored projects already contain a local data URL; no network request is needed.
+   const encoded=item.url.startsWith('data:image/')?item.url:
+    await fetch(item.url).then(r=>{if(!r.ok)throw Error('Не удалось получить изображение');return r.blob()}).then(fileToDataURL);
+   items.push({name:item.name,image:encoded,zoom:item.zoom,x:item.x,y:item.y,
     blur:item.blur,faceFill:item.faceFill,fillColor:item.fillColor,copies:item.copies});
   }
   const project={format:PROJECT_FORMAT,version:PROJECT_VERSION,type:state.type,grid:state.grid,
