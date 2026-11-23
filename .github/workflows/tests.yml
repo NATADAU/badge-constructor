@@ -1,7 +1,7 @@
 name: Badge prototype tests
 on:
   push:
-    branches: [feature/a4-pdf]
+    branches: [feature/a4-pdf, feature/editor-controls]
   pull_request:
 jobs:
   test:
