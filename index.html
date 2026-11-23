@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Конструктор значков — прототип</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#21333b;background:#f3f6f7}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:990px;margin:auto;padding:20px}
+header{margin-bottom:20px}h1{font-size:clamp(24px,4vw,34px);margin:0 0 8px}p{line-height:1.5}
+.note{color:#52666b}.layout{display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr);gap:20px}
+.panel{background:white;border:1px solid #d9e2e5;border-radius:14px;padding:18px}
+.layout>.panel{align-self:start}
+label{display:block;font-weight:650;margin:0 0 8px}select,input[type=file],button{width:100%;font:inherit}
+select,input[type=file]{padding:10px;border:1px solid #aab9be;border-radius:8px;margin-bottom:18px}
+button{padding:11px;border:1px solid #8ba8ac;background:#e3f4f2;border-radius:9px;cursor:pointer}
+input[type=range]{width:100%;accent-color:#138b87}.value{float:right;font-weight:400}
+.canvas-wrap{display:grid;place-items:center;background:#eef4f5;border-radius:12px;padding:14px;min-height:350px}
+canvas{display:block;width:min(100%,440px);height:auto;aspect-ratio:1;touch-action:none;cursor:grab}
+canvas.dragging{cursor:grabbing}.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;margin-top:12px}
+.legend span:before{content:"";display:inline-block;width:13px;height:13px;border-radius:50%;border:2px solid var(--c);vertical-align:-2px;margin-right:5px}
+.status{font-size:14px;min-height:22px}.small{font-size:13px}
+.sheet-panel{margin-top:20px}.sheet-head{display:flex;flex-wrap:wrap;align-items:end;gap:18px}
+.sheet-head label{margin:0}.sheet-head input{width:85px;padding:10px;border:1px solid #aab9be;border-radius:8px;font:inherit}
+.sheet-head button{width:auto;min-width:175px;background:#168c86;color:white;border-color:#168c86;font-weight:650}
+.sheet-preview{display:block;width:min(100%,420px);height:auto;aspect-ratio:210/297;border:1px solid #ccd8db;margin:16px auto;background:white}
+button:disabled{opacity:.5;cursor:not-allowed}
+.switch-row{display:flex;align-items:center;gap:10px;margin:10px 0 15px;font-weight:500}
+.switch-row input{width:20px;height:20px;accent-color:#138b87}
+.nudge{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,44px);gap:4px;justify-content:center;margin:12px 0}
+.nudge button{padding:5px;font-size:20px}.nudge button:nth-child(1){grid-column:2;grid-row:1}
+.nudge button:nth-child(2){grid-column:1;grid-row:2}
+.nudge button:nth-child(3){grid-column:3;grid-row:2}
+.nudge button:nth-child(4){grid-column:2;grid-row:3}
+.designs{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;max-height:260px;overflow:auto}
+.design-row{display:flex;align-items:center;gap:7px;min-width:0}
+.design-row .choose{flex:1;display:flex;gap:9px;align-items:center;min-width:0;text-align:left;padding:7px;background:#f6fafb}
+.design-row .choose[aria-pressed="true"]{border:2px solid #168c86;background:#e3f4f2}
+.design-row img{width:36px;height:36px;object-fit:cover;border-radius:5px}
+.design-row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.design-row .remove{width:42px;flex:none;background:#fff1ef;border-color:#e5aaa1}
+#fillColorRow[hidden]{display:none}
+#fillColor{width:88px;height:42px;padding:3px;border:1px solid #aab9be;border-radius:8px;cursor:pointer;margin-bottom:13px}
+#copies{width:95px;padding:10px;border:1px solid #aab9be;border-radius:8px;margin-bottom:15px;font:inherit}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.wrap{padding:12px}.canvas-wrap{min-height:280px}}
+</style></head>
+<body><main class="wrap"><header><h1>Конструктор значков</h1><p class="note">Рабочая проверка: круглый макет, раскладка на А4 и PDF для печати.</p></header>
+<div class="layout"><section class="panel">
+<label for="size">Тип заготовки</label><select id="size">
+<option value="plastic">Пластик — бумага 33 мм</option>
+<option value="m25">Металл 25 мм — бумага 35 мм</option>
+<option value="m37">Металл 37 мм — бумага 48,5 мм</option>
+<option value="m44">Металл 44 мм — бумага 54 мм</option></select>
+<label for="file">Добавить рисунки (JPG, PNG, WebP)</label><input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+<label for="designs">Мои макеты</label>
+<div id="designs" class="designs" aria-label="Загруженные макеты"><p class="small note">Пока нет рисунков.</p></div>
+<label for="copies">Копий выбранного рисунка</label><input type="number" id="copies" min="1" max="200" value="1">
+<label for="zoom">Масштаб рисунка <output class="value" id="zoomText">100%</output></label><input id="zoom" type="range" min="50" max="300" step="5" value="100">
+<label for="faceFill">Свободные края вокруг рисунка</label>
+<select id="faceFill">
+<option value="none">Без заполнения</option>
+<option value="blur">Размытое продолжение + плавные края</option>
+<option value="color">Однотонный фон</option>
+</select>
+<div id="fillColorRow" hidden><label for="fillColor">Цвет фона</label><input id="fillColor" type="color" value="#d8e5e7"></div>
+<p class="small note">Уменьши рисунок и сравни варианты. Плавные края помогают скрыть прямоугольную границу; белые участки внутри самого файла не удаляются.</p>
+<label class="switch-row"><input type="checkbox" id="blur" checked> Размытая подложка на загибе</label>
+<label class="switch-row"><input type="checkbox" id="grid"> Сетка и направляющие (как в Figma)</label>
+<p class="small note">Перетаскивай рисунок пальцем или мышью. Для точной подгонки используй стрелки (также на клавиатуре).</p>
+<div class="nudge" role="group" aria-label="Точное перемещение рисунка">
+<button data-nudge="up" title="Вверх" aria-label="Сдвинуть вверх">↑</button>
+<button data-nudge="left" title="Влево" aria-label="Сдвинуть влево">←</button>
+<button data-nudge="right" title="Вправо" aria-label="Сдвинуть вправо">→</button>
+<button data-nudge="down" title="Вниз" aria-label="Сдвинуть вниз">↓</button>
+</div>
+<p class="small note">Шаг стрелки — 0,2 мм; с Shift — 1 мм. Сетка и направляющие не печатаются.</p>
+<button id="reset" type="button">Вернуть рисунок в центр</button>
+<p class="status note" id="status" role="status">Загрузи один или несколько рисунков, чтобы начать.</p>
+</section><section class="panel">
+<div class="canvas-wrap"><canvas id="preview" width="700" height="700" aria-label="Предварительный просмотр круглого значка"></canvas></div>
+<div class="legend"><span style="--c:#364b56">Бумажный круг</span><span style="--c:#188e91">Лицевая часть</span><span style="--c:#d57b33">Безопасная зона</span></div>
+<p class="small note">Служебные линии нужны только для редактора. Размеры бумажных кругов проверены печатью и примеркой; изготовление на прессе ещё предстоит проверить.</p>
+</section></div>
+<section class="panel sheet-panel"><div class="sheet-head">
+
+<button id="download" type="button" disabled>Скачать PDF А4</button></div>
+<p class="small note" id="sheetInfo">Загрузи несколько рисунков. Все макеты будут одного диаметра.</p>
+<canvas id="sheet" class="sheet-preview" width="560" height="792" aria-label="Предварительный просмотр листа А4"></canvas>
+<p class="small note">Печатай PDF в масштабе 100% («Фактический размер»). Все рисунки имеют общий выбранный диаметр. Контур бумажного круга печатается; цветные служебные окружности — нет.</p>
+</section></main>
+<script>
+'use strict';
+const presets={plastic:{paper:33,face:33},m25:{paper:35,face:25},m37:{paper:48.5,face:37},m44:{paper:54,face:44}};
+const el=id=>document.getElementById(id),cv=el('preview'),ctx=cv.getContext('2d');
+const state={type:'plastic',image:null,zoom:1,x:0,y:0,url:null,blur:true,grid:false,faceFill:"none",fillColor:"#d8e5e7",items:[],selected:null};
+let nextId=1;
+function active(){return state.items.find(i=>i.id===state.selected)||null}
+function saveActive(){const i=active();if(i)Object.assign(i,{zoom:state.zoom,x:state.x,y:state.y,blur:state.blur,faceFill:state.faceFill,fillColor:state.fillColor})}
+function selectDesign(id){
+ saveActive();state.selected=id;
+ const i=active();if(!i)return;
+ Object.assign(state,{image:i.image,zoom:i.zoom,x:i.x,y:i.y,blur:i.blur,faceFill:i.faceFill,fillColor:i.fillColor,url:i.url});
+ el('zoom').value=String(Math.round(i.zoom*100));el('zoomText').textContent=Math.round(i.zoom*100)+'%';
+ el('blur').checked=i.blur;el('faceFill').value=i.faceFill;el('fillColor').value=i.fillColor;el('fillColorRow').hidden=i.faceFill!=='color';el('copies').value=i.copies;
+ renderDesigns();draw();
+}
+function renderDesigns(){
+ const parent=el('designs');parent.replaceChildren();
+ if(!state.items.length){const p=document.createElement('p');p.className='small note';p.textContent='Пока нет рисунков.';parent.append(p);return}
+ for(const item of state.items){
+  const row=document.createElement('div');row.className='design-row';
+  const btn=document.createElement('button');btn.type='button';btn.className='choose';
+  btn.setAttribute('aria-pressed',String(item.id===state.selected));
+  btn.title='Редактировать '+item.name;
+  const img=document.createElement('img');img.src=item.url;img.alt='';
+  const label=document.createElement('span');label.className='name';label.textContent=item.name+' — '+item.copies+' шт.';
+  btn.append(img,label);btn.addEventListener('click',()=>selectDesign(item.id));
+  const remove=document.createElement('button');remove.type='button';remove.className='remove';remove.textContent='×';
+  remove.title='Удалить '+item.name;remove.setAttribute('aria-label','Удалить '+item.name);
+  remove.addEventListener('click',()=>removeDesign(item.id));
+  row.append(btn,remove);parent.append(row);
+ }
+}
+function removeDesign(id){
+ const idx=state.items.findIndex(i=>i.id===id);if(idx<0)return;
+ const [item]=state.items.splice(idx,1);
+ if(state.selected===id){
+  state.selected=null;state.image=null;state.url=null;
+  if(state.items.length)selectDesign(state.items[Math.min(idx,state.items.length-1)].id);
+  else{renderDesigns();draw()}
+ }else{renderDesigns();updateSheet()}
+ if(item.feathered){item.feathered.width=0;item.feathered.height=0}URL.revokeObjectURL(item.url);
+}
+const center=350,maxRadius=275;let pointer=null;
+const sheet=el('sheet'),sheetCtx=sheet.getContext('2d');
+function geometry(){const p=presets[state.type],factor=maxRadius/(p.paper/2);return {paper:maxRadius,face:p.face/2*factor,safe:Math.max(0,(p.face/2-2)*factor)}}
+function circle(r,fill,stroke,dash=[]){ctx.beginPath();ctx.arc(center,center,r,0,Math.PI*2);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2.5;ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([])}}
+function drawImageFit(image,r,scale,x,y){const base=Math.max((2*r)/image.naturalWidth,(2*r)/image.naturalHeight);const w=image.naturalWidth*base*scale,h=image.naturalHeight*base*scale;ctx.drawImage(image,center-w/2+x,center-h/2+y,w,h)}
+function drawGrid(g){
+ ctx.save();ctx.beginPath();ctx.arc(center,center,g.face,0,Math.PI*2);ctx.clip();
+ ctx.strokeStyle='rgba(20,92,110,.42)';ctx.lineWidth=1.3;
+ const step=g.face*2/6;ctx.beginPath();
+ for(let i=-2;i<=2;i++){const x=center+i*step;
+ ctx.moveTo(x,center-g.face);ctx.lineTo(x,center+g.face);
+ ctx.moveTo(center-g.face,x);ctx.lineTo(center+g.face,x)}
+ ctx.stroke();ctx.strokeStyle='rgba(0,102,139,.9)';ctx.lineWidth=2;
+ ctx.beginPath();ctx.moveTo(center,center-g.face);ctx.lineTo(center,center+g.face);
+ ctx.moveTo(center-g.face,center);ctx.lineTo(center+g.face,center);ctx.stroke();
+ ctx.restore();
+}
+// The same image layering is used for both preview and printable circles.
+// Service guides are drawn separately, so they never appear in the PDF.
+// Feather only the outer edges of a rectangular source image. Preserve its center.
+function featherImage(img){
+ const max=900,scale=Math.min(1,max/Math.max((img.naturalWidth||img.width),(img.naturalHeight||img.height)));
+ const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+ const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;
+ const q=tmp.getContext('2d');q.drawImage(img,0,0,w,h);
+ q.globalCompositeOperation='destination-in';
+ const edge=.13;
+ const masks=[
+  [0,0,w*edge,0,[0,0,1,1]],
+  [w*(1-edge),0,w,0,[0,1,1,0]],
+  [0,0,0,h*edge,[0,0,1,1]],
+  [0,h*(1-edge),0,h,[0,1,1,0]]
+ ];
+ for(const [x0,y0,x1,y1,stops] of masks){
+  const gradient=q.createLinearGradient(x0,y0,x1,y1);
+  gradient.addColorStop(0,'rgba(0,0,0,'+stops[1]+')');
+  gradient.addColorStop(1,'rgba(0,0,0,'+stops[3]+')');
+  q.fillStyle=gradient;q.fillRect(0,0,w,h);
+ }
+ q.globalCompositeOperation='source-over';return tmp;
+}
+function paintBadge(c,x,y,r,item,outline=false){
+ const preset=presets[state.type],face=r*preset.face/preset.paper;
+ c.save();c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.clip();
+ c.fillStyle='#fff';c.fillRect(x-r,y-r,2*r,2*r);
+ if(item?.image){
+  function image(radius,scale,dx=0,dy=0,blur=0,soft=false){
+   const img=soft&&item.feathered?item.feathered:item.image;
+   const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+   const fit=Math.max(2*radius/iw,2*radius/ih);
+   const w=iw*fit*scale,h=ih*fit*scale;
+   c.save();if(blur)c.filter='blur('+blur+'px)';
+   c.drawImage(img,x-w/2+dx,y-h/2+dy,w,h);c.restore();
+  }
+  // Metal-only underlay remains independent of the visible-face fill.
+  if(state.type!=='plastic' && item.blur)image(r*1.3,1.6,0,0,r*.055);
+  c.save();c.beginPath();c.arc(x,y,face,0,Math.PI*2);c.clip();
+  if(item.faceFill==='color'){
+   c.fillStyle=item.fillColor;c.fillRect(x-face,y-face,2*face,2*face);
+  }else if(item.faceFill==='blur'){
+   image(face*1.35,1.65,0,0,face*.07);
+  }else if(state.type!=='plastic' && item.blur){
+   // The face is white in "no fill" mode, regardless of the bent edge.
+   c.fillStyle='#fff';c.fillRect(x-face,y-face,2*face,2*face);
+  }
+  const dx=item.x*r/maxRadius,dy=item.y*r/maxRadius;
+  image(face,item.zoom,dx,dy,0,item.faceFill!=='none');
+  c.restore();
+  // With bend fill disabled, keep the natural edge behavior from the prior editor.
+  if(state.type!=='plastic' && !item.blur && item.faceFill==='none'){
+   // Already drawn on white: paper outside the visible face remains unprinted.
+  }
+ }
+ c.restore();
+ if(outline){c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.strokeStyle='#555';c.lineWidth=Math.max(.7,r*.004);c.stroke()}
+}
+function draw(){
+ saveActive();ctx.clearRect(0,0,700,700);
+ const g=geometry();
+ if(state.image)paintBadge(ctx,center,center,g.paper,state);
+ else{circle(g.paper,'#fff','#364b56');circle(g.face,'#e5eded');ctx.fillStyle='#697d83';ctx.textAlign='center';ctx.font='20px system-ui';ctx.fillText('Ваш рисунок',center,center)}
+ circle(g.paper,null,'#364b56');circle(g.face,null,'#188e91',[8,5]);circle(g.safe,null,'#d57b33',[3,6]);
+ if(state.grid)drawGrid(g);
+ updateSheet();
+}
+el('size').addEventListener('change',e=>{state.type=e.target.value;state.x=state.y=0;draw()});
+el('zoom').addEventListener('input',e=>{state.zoom=Number(e.target.value)/100;el('zoomText').textContent=e.target.value+'%';draw()});
+el('reset').addEventListener('click',()=>{state.x=state.y=0;state.zoom=1;el('zoom').value=100;el('zoomText').textContent='100%';draw()});
+el('blur').addEventListener('change',e=>{state.blur=e.target.checked;draw()});
+el('faceFill').addEventListener('change',e=>{state.faceFill=e.target.value;el('fillColorRow').hidden=state.faceFill!=='color';draw()});
+el('fillColor').addEventListener('input',e=>{state.fillColor=e.target.value;draw()});
+el('grid').addEventListener('change',e=>{state.grid=e.target.checked;draw()});
+function nudge(direction,large=false){
+ if(!state.image)return;
+ const step=(large?1:.2)*maxRadius/(presets[state.type].paper/2);
+ if(direction==='left')state.x-=step;
+ if(direction==='right')state.x+=step;
+ if(direction==='up')state.y-=step;
+ if(direction==='down')state.y+=step;
+ draw();
+}
+document.querySelectorAll('[data-nudge]').forEach(b=>b.addEventListener('click',()=>nudge(b.dataset.nudge)));
+document.addEventListener('keydown',e=>{
+ const mapping={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'};
+ if(!mapping[e.key]||!state.image)return;
+ const tag=(document.activeElement?.tagName||'').toLowerCase();
+ if(['input','select','textarea'].includes(tag))return;
+ e.preventDefault();nudge(mapping[e.key],e.shiftKey);
+});
+el('file').addEventListener('change',async e=>{
+ const files=Array.from(e.target.files||[]);
+ let added=0,rejected=0,lastId=null;
+ for(const file of files){
+  if(state.items.length>=60){rejected++;continue}
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>25*1024*1024){rejected++;continue}
+  const url=URL.createObjectURL(file),img=new Image();
+  try{
+   await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
+   if(img.naturalWidth*img.naturalHeight>40e6)throw Error('Слишком большое изображение');
+   const item={id:nextId++,name:file.name,image:img,url,zoom:1,x:0,y:0,blur:true,faceFill:"none",fillColor:"#d8e5e7",copies:1};
+   item.feathered=featherImage(img);state.items.push(item);lastId=item.id;added++;
+  }catch(err){URL.revokeObjectURL(url);rejected++}
+ }
+ e.target.value='';
+ if(lastId!==null)selectDesign(lastId);
+ else {renderDesigns();updateSheet()}
+ el('status').textContent='Добавлено рисунков: '+added+(rejected?'. Пропущено: '+rejected:'')+'.';
+});
+function point(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}}
+cv.addEventListener('pointerdown',e=>{if(!state.image)return;const p=point(e);pointer={id:e.pointerId,x:p.x,y:p.y,oldX:state.x,oldY:state.y};cv.setPointerCapture(e.pointerId);cv.classList.add('dragging')});
+cv.addEventListener('pointermove',e=>{if(!pointer||e.pointerId!==pointer.id)return;const p=point(e);state.x=pointer.oldX+p.x-pointer.x;state.y=pointer.oldY+p.y-pointer.y;draw()});
+function end(e){if(pointer&&e.pointerId===pointer.id){pointer=null;cv.classList.remove('dragging')}}
+cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+function clampCopies(n){return Math.max(1,Math.min(200,Math.trunc(Number(n)||1)))}
+function copies(){return state.items.reduce((sum,item)=>sum+item.copies,0)}
+function slots(){const result=[];for(const item of state.items)for(let n=0;n<item.copies;n++)result.push(item);return result}
+function plan(){const d=presets[state.type].paper,margin=10,gap=3;const cols=Math.floor((210-2*margin+gap)/(d+gap));const rows=Math.floor((297-2*margin+gap)/(d+gap));return {d,margin,gap,cols,rows,perPage:cols*rows,pages:Math.ceil(copies()/(cols*rows))}}
+function drawPrintedBadge(c,x,y,r,item){paintBadge(c,x,y,r,item,true)}
+function renderSheet(c,canvas,pageIndex){const p=plan(),mm=canvas.width/210,all=slots(),total=all.length;c.fillStyle='#fff';c.fillRect(0,0,canvas.width,canvas.height);
+  for(let i=0;i<p.perPage;i++){const n=pageIndex*p.perPage+i;if(n>=total)break;
+    const col=i%p.cols,row=Math.floor(i/p.cols);
+    const x=(p.margin+p.d/2+col*(p.d+p.gap))*mm,y=(p.margin+p.d/2+row*(p.d+p.gap))*mm;
+    drawPrintedBadge(c,x,y,p.d/2*mm,all[n]);
+  }
+}
+function updateSheet(){
+  const p=plan();el('download').disabled=!state.items.length;
+  el('sheetInfo').textContent=state.items.length?
+ ('Макетов: '+state.items.length+'; всего значков: '+copies()+'; на одном А4: до '+p.perPage+'; листов: '+p.pages+'. Бумажный диаметр: '+p.d+' мм.')
+ :'Загрузи рисунки для раскладки.';
+  renderSheet(sheetCtx,sheet,0);
+}
+el('copies').addEventListener('change',e=>{const i=active();if(!i)return;i.copies=clampCopies(e.target.value);e.target.value=String(i.copies);renderDesigns();updateSheet()});
+el('copies').addEventListener('input',e=>{const i=active();if(!i||!e.target.value)return;i.copies=clampCopies(e.target.value);renderDesigns();updateSheet()});
+function pdfFromJpegs(jpegs){
+ const enc=new TextEncoder(),parts=[],offsets=[0];let total=0;
+ const append=b=>{parts.push(b);total+=b.length},str=t=>append(enc.encode(t));
+ str('%PDF-1.4\n');
+ function obj(id,head,raw){offsets[id]=total;str(id+' 0 obj\n'+head);if(raw){str('\nstream\n');append(raw);str('\nendstream')}str('\nendobj\n')}
+ const pages=[];const w=210*72/25.4,h=297*72/25.4;
+ for(let i=0;i<jpegs.length;i++){
+  const base=3+i*3,imgId=base,contentId=base+1,pageId=base+2;pages.push(pageId+' 0 R');
+  const jpg=jpegs[i],cmd=enc.encode('q '+w.toFixed(5)+' 0 0 '+h.toFixed(5)+' 0 0 cm /Im0 Do Q\n');
+  obj(imgId,'<< /Type /XObject /Subtype /Image /Width '+jpg.w+' /Height '+jpg.h+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpg.bytes.length+' >>',jpg.bytes);
+  obj(contentId,'<< /Length '+cmd.length+' >>',cmd);
+  obj(pageId,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+w.toFixed(5)+' '+h.toFixed(5)+'] /Resources << /XObject << /Im0 '+imgId+' 0 R >> >> /Contents '+contentId+' 0 R >>');
+ }
+ obj(2,'<< /Type /Pages /Kids ['+pages.join(' ')+'] /Count '+pages.length+' >>');
+ obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+ const start=total;str('xref\n0 '+(3+jpegs.length*3)+'\n0000000000 65535 f \n');
+ for(let i=1;i<3+jpegs.length*3;i++)str(String(offsets[i]).padStart(10,'0')+' 00000 n \n');
+ str('trailer\n<< /Size '+(3+jpegs.length*3)+' /Root 1 0 R >>\nstartxref\n'+start+'\n%%EOF');
+ return new Blob(parts,{type:'application/pdf'});
+}
+async function downloadPdf(){
+ if(!state.items.length)return;saveActive();const btn=el('download');btn.disabled=true;btn.textContent='Создаём PDF…';
+ const jpegPages=[];
+ try{
+  const p=plan();if(p.pages>15)throw Error('Слишком много листов для пробного экспорта (максимум 15).');
+  for(let page=0;page<p.pages;page++){
+    const tmp=document.createElement('canvas');tmp.width=Math.round(210/25.4*180);tmp.height=Math.round(297/25.4*180);
+    renderSheet(tmp.getContext('2d'),tmp,page);
+    const data=tmp.toDataURL('image/jpeg',.95).split(',')[1],raw=atob(data),bytes=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+    jpegPages.push({w:tmp.width,h:tmp.height,bytes});tmp.width=tmp.height=0;
+  }
+  const pdf=pdfFromJpegs(jpegPages),url=URL.createObjectURL(pdf),a=document.createElement('a');
+  a.href=url;a.download='znachki-A4.pdf';document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);el('status').textContent='PDF готов. Печатай в масштабе 100%.';
+ }catch(e){el('status').textContent='Не удалось создать PDF: '+e.message}
+ finally{btn.disabled=false;btn.textContent='Скачать PDF А4'}
+}
+el('download').addEventListener('click',downloadPdf);
+draw();
+</script></body></html>
