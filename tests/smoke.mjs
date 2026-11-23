@@ -60,3 +60,18 @@ assert.match(script,/item\.feathered=featherImage\(img\)/);
 assert.match(script,/img\.naturalWidth\|\|img\.width/);
 assert.match(script,/item\.faceFill!=='none'/);
 console.log('OK: feathered edges and image/canvas dimensions');
+
+assert.match(html,/class="workspace-grid"/);
+for(const panel of ['designs-panel','editor-panel','paper-panel'])assert.match(html,new RegExp('class="panel '+panel+'"'));
+assert.equal((html.match(/id="preview"/g)||[]).length,1);
+assert.equal((html.match(/id="sheet"/g)||[]).length,1);
+assert.equal((html.match(/id="size"/g)||[]).length,1);
+assert.match(script,/function sheetCaption\(/);
+assert.match(script,/c\.fillText\(sheetCaption\(\),p\.margin\*mm,289\*mm\)/);
+const caption=vm.runInNewContext(
+  script.slice(script.indexOf('function sheetCaption()'),script.indexOf('function renderSheet(',script.indexOf('function sheetCaption()')))+';sheetCaption',
+  {state:{type:'m37'},presets:{m37:{face:37,paper:48.5},plastic:{face:33,paper:33}}}
+);
+assert.match(caption(),/37 мм/);
+assert.match(caption(),/48,5 мм/);
+console.log('OK: three-panel workspace, unique controls, and A4 size caption');
