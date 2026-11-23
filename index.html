@@ -55,11 +55,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <label for="faceFill">Свободные края вокруг рисунка</label>
 <select id="faceFill">
 <option value="none">Без заполнения</option>
-<option value="blur">Размытое продолжение рисунка</option>
+<option value="blur">Размытое продолжение + плавные края</option>
 <option value="color">Однотонный фон</option>
 </select>
 <div id="fillColorRow" hidden><label for="fillColor">Цвет фона</label><input id="fillColor" type="color" value="#d8e5e7"></div>
-<p class="small note">Уменьши рисунок и сравни варианты. Исходное изображение не изменяется.</p>
+<p class="small note">Уменьши рисунок и сравни варианты. Плавные края помогают скрыть прямоугольную границу; белые участки внутри самого файла не удаляются.</p>
 <label class="switch-row"><input type="checkbox" id="blur" checked> Размытая подложка на загибе</label>
 <label class="switch-row"><input type="checkbox" id="grid"> Сетка и направляющие (как в Figma)</label>
 <p class="small note">Перетаскивай рисунок пальцем или мышью. Для точной подгонки используй стрелки (также на клавиатуре).</p>
@@ -125,7 +125,7 @@ function removeDesign(id){
   if(state.items.length)selectDesign(state.items[Math.min(idx,state.items.length-1)].id);
   else{renderDesigns();draw()}
  }else{renderDesigns();updateSheet()}
- URL.revokeObjectURL(item.url);
+ if(item.feathered){item.feathered.width=0;item.feathered.height=0}URL.revokeObjectURL(item.url);
 }
 const center=350,maxRadius=275;let pointer=null;
 const sheet=el('sheet'),sheetCtx=sheet.getContext('2d');
@@ -146,13 +146,35 @@ function drawGrid(g){
 }
 // The same image layering is used for both preview and printable circles.
 // Service guides are drawn separately, so they never appear in the PDF.
+// Feather only the outer edges of a rectangular source image. Preserve its center.
+function featherImage(img){
+ const max=900,scale=Math.min(1,max/Math.max((img.naturalWidth||img.width),(img.naturalHeight||img.height)));
+ const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+ const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;
+ const q=tmp.getContext('2d');q.drawImage(img,0,0,w,h);
+ q.globalCompositeOperation='destination-in';
+ const edge=.13;
+ const masks=[
+  [0,0,w*edge,0,[0,0,1,1]],
+  [w*(1-edge),0,w,0,[0,1,1,0]],
+  [0,0,0,h*edge,[0,0,1,1]],
+  [0,h*(1-edge),0,h,[0,1,1,0]]
+ ];
+ for(const [x0,y0,x1,y1,stops] of masks){
+  const gradient=q.createLinearGradient(x0,y0,x1,y1);
+  gradient.addColorStop(0,'rgba(0,0,0,'+stops[1]+')');
+  gradient.addColorStop(1,'rgba(0,0,0,'+stops[3]+')');
+  q.fillStyle=gradient;q.fillRect(0,0,w,h);
+ }
+ q.globalCompositeOperation='source-over';return tmp;
+}
 function paintBadge(c,x,y,r,item,outline=false){
  const preset=presets[state.type],face=r*preset.face/preset.paper;
  c.save();c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.clip();
  c.fillStyle='#fff';c.fillRect(x-r,y-r,2*r,2*r);
  if(item?.image){
-  function image(radius,scale,dx=0,dy=0,blur=0){
-   const img=item.image;
+  function image(radius,scale,dx=0,dy=0,blur=0,soft=false){
+   const img=soft&&item.feathered?item.feathered:item.image;
    const fit=Math.max(2*radius/img.naturalWidth,2*radius/img.naturalHeight);
    const w=img.naturalWidth*fit*scale,h=img.naturalHeight*fit*scale;
    c.save();if(blur)c.filter='blur('+blur+'px)';
@@ -170,7 +192,7 @@ function paintBadge(c,x,y,r,item,outline=false){
    c.fillStyle='#fff';c.fillRect(x-face,y-face,2*face,2*face);
   }
   const dx=item.x*r/maxRadius,dy=item.y*r/maxRadius;
-  image(face,item.zoom,dx,dy);
+  image(face,item.zoom,dx,dy,0,item.faceFill!=='none');
   c.restore();
   // With bend fill disabled, keep the natural edge behavior from the prior editor.
   if(state.type!=='plastic' && !item.blur && item.faceFill==='none'){
@@ -224,7 +246,7 @@ el('file').addEventListener('change',async e=>{
    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
    if(img.naturalWidth*img.naturalHeight>40e6)throw Error('Слишком большое изображение');
    const item={id:nextId++,name:file.name,image:img,url,zoom:1,x:0,y:0,blur:true,faceFill:"none",fillColor:"#d8e5e7",copies:1};
-   state.items.push(item);lastId=item.id;added++;
+   item.feathered=featherImage(img);state.items.push(item);lastId=item.id;added++;
   }catch(err){URL.revokeObjectURL(url);rejected++}
  }
  e.target.value='';
