@@ -39,19 +39,82 @@ button:disabled{opacity:.5;cursor:not-allowed}
 #fillColor{width:88px;height:42px;padding:3px;border:1px solid #aab9be;border-radius:8px;cursor:pointer;margin-bottom:13px}
 #copies{width:95px;padding:10px;border:1px solid #aab9be;border-radius:8px;margin-bottom:15px;font:inherit}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.wrap{padding:12px}.canvas-wrap{min-height:280px}}
+/* Compact three-column workspace: list, editor, and printable sheet. */
+.wrap.workspace{max-width:1600px;margin:auto;padding:16px 22px 26px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:14px}
+.topbar h1{font-size:clamp(23px,2.4vw,30px);margin:0 0 3px}
+.topbar p{margin:0}
+.size-toolbar{width:min(100%,330px);flex:none}
+.size-toolbar label{font-size:13px;margin-bottom:5px}
+.size-toolbar select{margin:0;padding:9px 12px}
+.workspace-grid{display:grid;grid-template-columns:minmax(200px,0.85fr) minmax(330px,1.7fr) minmax(265px,1.1fr);gap:14px;align-items:start}
+.workspace-grid>.panel{min-width:0;padding:15px;border-radius:12px}
+.workspace-grid h2{font-size:17px;margin:0 0 14px;letter-spacing:-.02em}
+.workspace-grid label{font-size:13px}
+.designs-panel .designs{max-height:50vh;min-height:90px;margin:4px 0 15px}
+.designs-panel #file{font-size:12px;width:100%;padding:8px 4px;margin-bottom:12px}
+.designs-panel #copies{margin-bottom:8px}
+.designs-panel .status{font-size:12px;margin-bottom:0}
+.design-row img{width:42px;height:42px}
+.design-row .choose{font-size:12px;min-width:0}
+.editor-panel .canvas-wrap{min-height:0;padding:10px}
+.editor-panel canvas{width:min(100%,460px)}
+.editor-panel .legend{gap:9px;margin-top:10px;font-size:11px}
+.editor-panel .legend span:before{width:10px;height:10px}
+.editor-panel>.small.note{font-size:11px;line-height:1.35;margin:9px 0 14px}
+.editor-tools{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:16px;align-items:start}
+.editor-tools>label[for=zoom],.editor-tools>input#zoom{grid-column:1/-1}
+.editor-tools>label[for=zoom]{margin:2px 0 0}
+.editor-tools>input#zoom{margin:0 0 12px}
+.editor-tools>label[for=faceFill],.editor-tools>select#faceFill{grid-column:1/-1}
+.editor-tools>select#faceFill{margin-bottom:8px}
+.editor-tools>#fillColorRow{grid-column:1/-1}
+.editor-tools>.small.note{grid-column:1/-1;font-size:11px;line-height:1.35;margin:3px 0 9px}
+.editor-tools>.switch-row{grid-column:1/-1;margin:5px 0}
+.editor-tools>.nudge{grid-column:1;grid-row:auto;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,32px);gap:3px;margin:5px auto}
+.editor-tools>.nudge button{font-size:16px;padding:2px}
+.editor-tools>#reset{grid-column:2;align-self:center;font-size:12px;padding:9px}
+.paper-panel .sheet-head{display:block}
+.paper-panel .sheet-head button{width:100%;min-width:0;padding:10px}
+.paper-panel .sheet-preview{width:min(100%,360px);margin:12px auto}
+.paper-panel .small.note{font-size:11px;line-height:1.4}
+.paper-panel #sheetInfo{margin:10px 0}
+@media (max-width:1030px){
+ .workspace-grid{grid-template-columns:minmax(200px,.8fr) minmax(350px,1.5fr)}
+ .paper-panel{grid-column:1/-1;display:grid;grid-template-columns:minmax(180px,1fr) minmax(230px,360px);gap:8px 18px}
+ .paper-panel .paper-title,.paper-panel .sheet-head,.paper-panel #sheetInfo{grid-column:1}
+ .paper-panel .sheet-preview{grid-column:2;grid-row:1/5;margin:0 auto}
+ .paper-panel>.small.note{grid-column:1}
+}
+@media (max-width:700px){
+ .wrap.workspace{padding:12px}
+ .topbar{flex-wrap:wrap;gap:10px}
+ .size-toolbar{width:100%}
+ .workspace-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+ .paper-panel{grid-column:auto;display:block}
+ .paper-panel .sheet-preview{width:min(100%,360px);margin:12px auto}
+ .designs-panel .designs{max-height:180px}
+ .editor-tools{column-gap:12px}
+}
 </style></head>
-<body><main class="wrap"><header><h1>Конструктор значков</h1><p class="note">Рабочая проверка: круглый макет, раскладка на А4 и PDF для печати.</p></header>
-<div class="layout"><section class="panel">
-<label for="size">Тип заготовки</label><select id="size">
+<body><main class="wrap workspace">
+<header class="topbar"><div><h1>Конструктор значков</h1><p class="note small">Подготовка круглых значков к печати</p></div><div class="size-toolbar"><label for="size">Тип заготовки</label><select id="size">
 <option value="plastic">Пластик — бумага 33 мм</option>
 <option value="m25">Металл 25 мм — бумага 35 мм</option>
 <option value="m37">Металл 37 мм — бумага 48,5 мм</option>
 <option value="m44">Металл 44 мм — бумага 54 мм</option></select>
-<label for="file">Добавить рисунки (JPG, PNG, WebP)</label><input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+</div></header>
+<div class="workspace-grid">
+<section class="panel designs-panel"><h2>Мои макеты</h2><label for="file">Добавить рисунки (JPG, PNG, WebP)</label><input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple>
 <label for="designs">Мои макеты</label>
 <div id="designs" class="designs" aria-label="Загруженные макеты"><p class="small note">Пока нет рисунков.</p></div>
 <label for="copies">Копий выбранного рисунка</label><input type="number" id="copies" min="1" max="200" value="1">
-<label for="zoom">Масштаб рисунка <output class="value" id="zoomText">100%</output></label><input id="zoom" type="range" min="50" max="300" step="5" value="100">
+<p class="small note">Выбери рисунок из списка, чтобы редактировать его.</p><p class="status note" id="status" role="status">Загрузи один или несколько рисунков, чтобы начать.</p>
+</section>
+<section class="panel editor-panel"><h2>Редактор значка</h2><div class="canvas-wrap"><canvas id="preview" width="700" height="700" aria-label="Предварительный просмотр круглого значка"></canvas></div>
+<div class="legend"><span style="--c:#364b56">Бумажный круг</span><span style="--c:#188e91">Лицевая часть</span><span style="--c:#d57b33">Безопасная зона</span></div>
+<p class="small note">Служебные линии нужны только для редактора. Размеры бумажных кругов проверены печатью и примеркой; изготовление на прессе ещё предстоит проверить.</p>
+<div class="editor-tools"><label for="zoom">Масштаб рисунка <output class="value" id="zoomText">100%</output></label><input id="zoom" type="range" min="50" max="300" step="5" value="100">
 <label for="faceFill">Свободные края вокруг рисунка</label>
 <select id="faceFill">
 <option value="none">Без заполнения</option>
@@ -71,19 +134,15 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </div>
 <p class="small note">Шаг стрелки — 0,2 мм; с Shift — 1 мм. Сетка и направляющие не печатаются.</p>
 <button id="reset" type="button">Вернуть рисунок в центр</button>
-<p class="status note" id="status" role="status">Загрузи один или несколько рисунков, чтобы начать.</p>
-</section><section class="panel">
-<div class="canvas-wrap"><canvas id="preview" width="700" height="700" aria-label="Предварительный просмотр круглого значка"></canvas></div>
-<div class="legend"><span style="--c:#364b56">Бумажный круг</span><span style="--c:#188e91">Лицевая часть</span><span style="--c:#d57b33">Безопасная зона</span></div>
-<p class="small note">Служебные линии нужны только для редактора. Размеры бумажных кругов проверены печатью и примеркой; изготовление на прессе ещё предстоит проверить.</p>
-</section></div>
-<section class="panel sheet-panel"><div class="sheet-head">
+</div></section>
+<section class="panel paper-panel"><div class="paper-title"><h2>Лист А4</h2></div><div class="sheet-head">
 
 <button id="download" type="button" disabled>Скачать PDF А4</button></div>
 <p class="small note" id="sheetInfo">Загрузи несколько рисунков. Все макеты будут одного диаметра.</p>
 <canvas id="sheet" class="sheet-preview" width="560" height="792" aria-label="Предварительный просмотр листа А4"></canvas>
 <p class="small note">Печатай PDF в масштабе 100% («Фактический размер»). Все рисунки имеют общий выбранный диаметр. Контур бумажного круга печатается; цветные служебные окружности — нет.</p>
-</section></main>
+</section>
+</div></main>
 <script>
 'use strict';
 const presets={plastic:{paper:33,face:33},m25:{paper:35,face:25},m37:{paper:48.5,face:37},m44:{paper:54,face:44}};
@@ -265,12 +324,22 @@ function copies(){return state.items.reduce((sum,item)=>sum+item.copies,0)}
 function slots(){const result=[];for(const item of state.items)for(let n=0;n<item.copies;n++)result.push(item);return result}
 function plan(){const d=presets[state.type].paper,margin=10,gap=3;const cols=Math.floor((210-2*margin+gap)/(d+gap));const rows=Math.floor((297-2*margin+gap)/(d+gap));return {d,margin,gap,cols,rows,perPage:cols*rows,pages:Math.ceil(copies()/(cols*rows))}}
 function drawPrintedBadge(c,x,y,r,item){paintBadge(c,x,y,r,item,true)}
+function sheetCaption(){
+ const p=presets[state.type],n=v=>String(v).replace('.',',');
+ return state.type==='plastic'
+  ?'Пластиковый значок · бумажный круг Ø '+n(p.paper)+' мм'
+  :'Металлический значок Ø '+n(p.face)+' мм · бумажный круг Ø '+n(p.paper)+' мм';
+}
 function renderSheet(c,canvas,pageIndex){const p=plan(),mm=canvas.width/210,all=slots(),total=all.length;c.fillStyle='#fff';c.fillRect(0,0,canvas.width,canvas.height);
   for(let i=0;i<p.perPage;i++){const n=pageIndex*p.perPage+i;if(n>=total)break;
     const col=i%p.cols,row=Math.floor(i/p.cols);
     const x=(p.margin+p.d/2+col*(p.d+p.gap))*mm,y=(p.margin+p.d/2+row*(p.d+p.gap))*mm;
     drawPrintedBadge(c,x,y,p.d/2*mm,all[n]);
   }
+  // Footer remains outside every cut circle, on each exported PDF page.
+  c.save();c.fillStyle='#354b54';c.font=(2.65*mm)+'px system-ui, sans-serif';
+  c.textAlign='left';c.textBaseline='alphabetic';c.fillText(sheetCaption(),p.margin*mm,289*mm);
+  c.restore();
 }
 function updateSheet(){
   const p=plan();el('download').disabled=!state.items.length;
