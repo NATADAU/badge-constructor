@@ -54,3 +54,9 @@ assert.match(script,/function paintBadge\(/);
 assert.match(script,/paintBadge\(c,x,y,r,item,true\)/);
 assert.match(script,/faceFill:state\.faceFill/);
 console.log('OK: selectable face fills and print-preview shared renderer');
+
+assert.match(script,/function featherImage\(/);
+assert.match(script,/item\.feathered=featherImage\(img\)/);
+assert.match(script,/img\.naturalWidth\|\|img\.width/);
+assert.match(script,/item\.faceFill!=='none'/);
+console.log('OK: feathered edges and image/canvas dimensions');
