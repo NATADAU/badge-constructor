@@ -27,3 +27,22 @@ assert.ok(dimensions);
 assert.ok(Math.abs(Number(dimensions[1])-595.27559)<.001);
 assert.ok(Math.abs(Number(dimensions[2])-841.88976)<.001);
 console.log('OK: syntax, paper diameters, A4, PDF pages and offsets');
+
+assert.match(html,/id="designs"/);
+assert.match(html,/type="file"[^>]*multiple/);
+assert.equal((html.match(/id="copies"/g)||[]).length,1);
+assert.match(script,/function selectDesign\(/);
+assert.match(script,/function saveActive\(/);
+assert.match(script,/drawPrintedBadge\(c,x,y,p\.d\/2\*mm,all\[n\]\)/);
+const slotStart=script.indexOf('function clampCopies(');
+const slotEnd=script.indexOf('function plan()',slotStart);
+assert.ok(slotStart>0&&slotEnd>slotStart);
+const tools=vm.runInNewContext(
+  script.slice(slotStart,slotEnd)+';({clampCopies,copies,slots})',
+  {state:{items:[{id:1,copies:2},{id:2,copies:1},{id:3,copies:3}]}}
+);
+assert.equal(tools.clampCopies(0),1);
+assert.equal(tools.clampCopies(999),200);
+assert.equal(tools.copies(),6);
+assert.deepEqual(Array.from(tools.slots(),i=>i.id),[1,1,2,3,3,3]);
+console.log('OK: multiple designs and independent counts');
