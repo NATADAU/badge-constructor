@@ -35,6 +35,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .design-row img{width:36px;height:36px;object-fit:cover;border-radius:5px}
 .design-row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .design-row .remove{width:42px;flex:none;background:#fff1ef;border-color:#e5aaa1}
+#fillColorRow[hidden]{display:none}
+#fillColor{width:88px;height:42px;padding:3px;border:1px solid #aab9be;border-radius:8px;cursor:pointer;margin-bottom:13px}
 #copies{width:95px;padding:10px;border:1px solid #aab9be;border-radius:8px;margin-bottom:15px;font:inherit}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.wrap{padding:12px}.canvas-wrap{min-height:280px}}
 </style></head>
@@ -50,6 +52,14 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div id="designs" class="designs" aria-label="Загруженные макеты"><p class="small note">Пока нет рисунков.</p></div>
 <label for="copies">Копий выбранного рисунка</label><input type="number" id="copies" min="1" max="200" value="1">
 <label for="zoom">Масштаб рисунка <output class="value" id="zoomText">100%</output></label><input id="zoom" type="range" min="50" max="300" step="5" value="100">
+<label for="faceFill">Свободные края вокруг рисунка</label>
+<select id="faceFill">
+<option value="none">Без заполнения</option>
+<option value="blur">Размытое продолжение рисунка</option>
+<option value="color">Однотонный фон</option>
+</select>
+<div id="fillColorRow" hidden><label for="fillColor">Цвет фона</label><input id="fillColor" type="color" value="#d8e5e7"></div>
+<p class="small note">Уменьши рисунок и сравни варианты. Исходное изображение не изменяется.</p>
 <label class="switch-row"><input type="checkbox" id="blur" checked> Размытая подложка на загибе</label>
 <label class="switch-row"><input type="checkbox" id="grid"> Сетка и направляющие (как в Figma)</label>
 <p class="small note">Перетаскивай рисунок пальцем или мышью. Для точной подгонки используй стрелки (также на клавиатуре).</p>
@@ -78,16 +88,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
 'use strict';
 const presets={plastic:{paper:33,face:33},m25:{paper:35,face:25},m37:{paper:48.5,face:37},m44:{paper:54,face:44}};
 const el=id=>document.getElementById(id),cv=el('preview'),ctx=cv.getContext('2d');
-const state={type:'plastic',image:null,zoom:1,x:0,y:0,url:null,blur:true,grid:false,items:[],selected:null};
+const state={type:'plastic',image:null,zoom:1,x:0,y:0,url:null,blur:true,grid:false,faceFill:"none",fillColor:"#d8e5e7",items:[],selected:null};
 let nextId=1;
 function active(){return state.items.find(i=>i.id===state.selected)||null}
-function saveActive(){const i=active();if(i)Object.assign(i,{zoom:state.zoom,x:state.x,y:state.y,blur:state.blur})}
+function saveActive(){const i=active();if(i)Object.assign(i,{zoom:state.zoom,x:state.x,y:state.y,blur:state.blur,faceFill:state.faceFill,fillColor:state.fillColor})}
 function selectDesign(id){
  saveActive();state.selected=id;
  const i=active();if(!i)return;
- Object.assign(state,{image:i.image,zoom:i.zoom,x:i.x,y:i.y,blur:i.blur,url:i.url});
+ Object.assign(state,{image:i.image,zoom:i.zoom,x:i.x,y:i.y,blur:i.blur,faceFill:i.faceFill,fillColor:i.fillColor,url:i.url});
  el('zoom').value=String(Math.round(i.zoom*100));el('zoomText').textContent=Math.round(i.zoom*100)+'%';
- el('blur').checked=i.blur;el('copies').value=i.copies;
+ el('blur').checked=i.blur;el('faceFill').value=i.faceFill;el('fillColor').value=i.fillColor;el('fillColorRow').hidden=i.faceFill!=='color';el('copies').value=i.copies;
  renderDesigns();draw();
 }
 function renderDesigns(){
@@ -134,25 +144,48 @@ function drawGrid(g){
  ctx.moveTo(center-g.face,center);ctx.lineTo(center+g.face,center);ctx.stroke();
  ctx.restore();
 }
-function draw(){
- saveActive();ctx.clearRect(0,0,700,700);const g=geometry();
- circle(g.paper,'#fff','#364b56');
- ctx.save();ctx.beginPath();ctx.arc(center,center,g.paper,0,Math.PI*2);ctx.clip();
- if(state.image){
-  if(state.type!=='plastic' && state.blur){
-   ctx.save();ctx.filter='blur(22px)';drawImageFit(state.image,g.paper+70,1.45,0,0);ctx.restore();
-   ctx.save();ctx.beginPath();ctx.arc(center,center,g.face,0,Math.PI*2);ctx.clip();
-   drawImageFit(state.image,g.face,state.zoom,state.x,state.y);ctx.restore();
-  }else{
-   drawImageFit(state.image,g.face,state.zoom,state.x,state.y);
+// The same image layering is used for both preview and printable circles.
+// Service guides are drawn separately, so they never appear in the PDF.
+function paintBadge(c,x,y,r,item,outline=false){
+ const preset=presets[state.type],face=r*preset.face/preset.paper;
+ c.save();c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.clip();
+ c.fillStyle='#fff';c.fillRect(x-r,y-r,2*r,2*r);
+ if(item?.image){
+  function image(radius,scale,dx=0,dy=0,blur=0){
+   const img=item.image;
+   const fit=Math.max(2*radius/img.naturalWidth,2*radius/img.naturalHeight);
+   const w=img.naturalWidth*fit*scale,h=img.naturalHeight*fit*scale;
+   c.save();if(blur)c.filter='blur('+blur+'px)';
+   c.drawImage(img,x-w/2+dx,y-h/2+dy,w,h);c.restore();
   }
- }else{
-  circle(g.face,'#e5eded');ctx.fillStyle='#697d83';ctx.textAlign='center';
-  ctx.font='20px system-ui';ctx.fillText('Ваш рисунок',center,center);
+  // Metal-only underlay remains independent of the visible-face fill.
+  if(state.type!=='plastic' && item.blur)image(r*1.3,1.6,0,0,r*.055);
+  c.save();c.beginPath();c.arc(x,y,face,0,Math.PI*2);c.clip();
+  if(item.faceFill==='color'){
+   c.fillStyle=item.fillColor;c.fillRect(x-face,y-face,2*face,2*face);
+  }else if(item.faceFill==='blur'){
+   image(face*1.35,1.65,0,0,face*.07);
+  }else if(state.type!=='plastic' && item.blur){
+   // The face is white in "no fill" mode, regardless of the bent edge.
+   c.fillStyle='#fff';c.fillRect(x-face,y-face,2*face,2*face);
+  }
+  const dx=item.x*r/maxRadius,dy=item.y*r/maxRadius;
+  image(face,item.zoom,dx,dy);
+  c.restore();
+  // With bend fill disabled, keep the natural edge behavior from the prior editor.
+  if(state.type!=='plastic' && !item.blur && item.faceFill==='none'){
+   // Already drawn on white: paper outside the visible face remains unprinted.
+  }
  }
- ctx.restore();
- circle(g.paper,null,'#364b56');circle(g.face,null,'#188e91',[8,5]);
- circle(g.safe,null,'#d57b33',[3,6]);
+ c.restore();
+ if(outline){c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.strokeStyle='#555';c.lineWidth=Math.max(.7,r*.004);c.stroke()}
+}
+function draw(){
+ saveActive();ctx.clearRect(0,0,700,700);
+ const g=geometry();
+ if(state.image)paintBadge(ctx,center,center,g.paper,state);
+ else{circle(g.paper,'#fff','#364b56');circle(g.face,'#e5eded');ctx.fillStyle='#697d83';ctx.textAlign='center';ctx.font='20px system-ui';ctx.fillText('Ваш рисунок',center,center)}
+ circle(g.paper,null,'#364b56');circle(g.face,null,'#188e91',[8,5]);circle(g.safe,null,'#d57b33',[3,6]);
  if(state.grid)drawGrid(g);
  updateSheet();
 }
@@ -160,6 +193,8 @@ el('size').addEventListener('change',e=>{state.type=e.target.value;state.x=state
 el('zoom').addEventListener('input',e=>{state.zoom=Number(e.target.value)/100;el('zoomText').textContent=e.target.value+'%';draw()});
 el('reset').addEventListener('click',()=>{state.x=state.y=0;state.zoom=1;el('zoom').value=100;el('zoomText').textContent='100%';draw()});
 el('blur').addEventListener('change',e=>{state.blur=e.target.checked;draw()});
+el('faceFill').addEventListener('change',e=>{state.faceFill=e.target.value;el('fillColorRow').hidden=state.faceFill!=='color';draw()});
+el('fillColor').addEventListener('input',e=>{state.fillColor=e.target.value;draw()});
 el('grid').addEventListener('change',e=>{state.grid=e.target.checked;draw()});
 function nudge(direction,large=false){
  if(!state.image)return;
@@ -188,7 +223,7 @@ el('file').addEventListener('change',async e=>{
   try{
    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
    if(img.naturalWidth*img.naturalHeight>40e6)throw Error('Слишком большое изображение');
-   const item={id:nextId++,name:file.name,image:img,url,zoom:1,x:0,y:0,blur:true,copies:1};
+   const item={id:nextId++,name:file.name,image:img,url,zoom:1,x:0,y:0,blur:true,faceFill:"none",fillColor:"#d8e5e7",copies:1};
    state.items.push(item);lastId=item.id;added++;
   }catch(err){URL.revokeObjectURL(url);rejected++}
  }
@@ -206,25 +241,7 @@ function clampCopies(n){return Math.max(1,Math.min(200,Math.trunc(Number(n)||1))
 function copies(){return state.items.reduce((sum,item)=>sum+item.copies,0)}
 function slots(){const result=[];for(const item of state.items)for(let n=0;n<item.copies;n++)result.push(item);return result}
 function plan(){const d=presets[state.type].paper,margin=10,gap=3;const cols=Math.floor((210-2*margin+gap)/(d+gap));const rows=Math.floor((297-2*margin+gap)/(d+gap));return {d,margin,gap,cols,rows,perPage:cols*rows,pages:Math.ceil(copies()/(cols*rows))}}
-function drawPrintedBadge(c,x,y,r,item){
- const g=geometry(),face=r*g.face/g.paper;
- c.save();c.beginPath();c.arc(x,y,r,0,2*Math.PI);c.clip();c.fillStyle='#fff';c.fill();
- if(item.image){
-  function image(radius,scale,shiftX,shiftY,blur=0){
-   const base=Math.max(2*radius/item.image.naturalWidth,2*radius/item.image.naturalHeight);
-   const w=item.image.naturalWidth*base*scale,h=item.image.naturalHeight*base*scale;
-   c.save();if(blur)c.filter='blur('+blur+'px)';
-   c.drawImage(item.image,x-w/2+shiftX,y-h/2+shiftY,w,h);c.restore();
-  }
-  if(state.type!=='plastic' && item.blur){
-   image(r*1.25,1.45,0,0,r*.08);
-   c.save();c.beginPath();c.arc(x,y,face,0,2*Math.PI);c.clip();
-   image(face,item.zoom,item.x*r/g.paper,item.y*r/g.paper);c.restore();
-  }else image(face,item.zoom,item.x*r/g.paper,item.y*r/g.paper);
- }
- c.restore();c.beginPath();c.arc(x,y,r,0,2*Math.PI);
- c.strokeStyle='#555';c.lineWidth=Math.max(.7,r*.004);c.stroke();
-}
+function drawPrintedBadge(c,x,y,r,item){paintBadge(c,x,y,r,item,true)}
 function renderSheet(c,canvas,pageIndex){const p=plan(),mm=canvas.width/210,all=slots(),total=all.length;c.fillStyle='#fff';c.fillRect(0,0,canvas.width,canvas.height);
   for(let i=0;i<p.perPage;i++){const n=pageIndex*p.perPage+i;if(n>=total)break;
     const col=i%p.cols,row=Math.floor(i/p.cols);
