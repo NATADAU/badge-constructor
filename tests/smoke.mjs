@@ -41,7 +41,7 @@ const tools=vm.runInNewContext(
   script.slice(slotStart,slotEnd)+';({clampCopies,copies,slots})',
   {state:{items:[{id:1,copies:2},{id:2,copies:1},{id:3,copies:3}]}}
 );
-assert.equal(tools.clampCopies(0),1);
+assert.equal(tools.clampCopies(0),0);
 assert.equal(tools.clampCopies(999),200);
 assert.equal(tools.copies(),6);
 assert.deepEqual(Array.from(tools.slots(),i=>i.id),[1,1,2,3,3,3]);
