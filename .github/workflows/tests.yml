@@ -1,7 +1,7 @@
 name: Badge prototype tests
 on:
   push:
-    branches: [feature/a4-pdf, feature/editor-controls, feature/multiple-designs, feature/fill-empty-edges]
+    branches: [feature/a4-pdf, feature/editor-controls, feature/multiple-designs, feature/fill-empty-edges, fix/soft-image-edges]
   pull_request:
 jobs:
   test:
