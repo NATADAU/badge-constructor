@@ -52,5 +52,5 @@ assert.match(html,/id="fillColor"/);
 for(const mode of ['none','blur','color'])assert.match(html,new RegExp('value="'+mode+'"'));
 assert.match(script,/function paintBadge\(/);
 assert.match(script,/paintBadge\(c,x,y,r,item,true\)/);
-assert.match(script,/faceFill:item\.faceFill/);
+assert.match(script,/faceFill:state\.faceFill/);
 console.log('OK: selectable face fills and print-preview shared renderer');
