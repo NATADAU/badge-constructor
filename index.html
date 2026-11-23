@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Конструктор значков — прототип</title>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Конструктор значков — прототип</title>
 <style>
 :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#21333b;background:#f3f6f7}
 *{box-sizing:border-box}body{margin:0}.wrap{max-width:990px;margin:auto;padding:20px}
@@ -163,6 +163,33 @@ button:disabled{opacity:.5;cursor:not-allowed}
 const presets={plastic:{paper:33,face:33},m25:{paper:35,face:25},m37:{paper:48.5,face:37},m44:{paper:54,face:44}};
 const el=id=>document.getElementById(id),cv=el('preview'),ctx=cv.getContext('2d');
 const state={type:'plastic',image:null,zoom:1,x:0,y:0,url:null,blur:true,grid:false,faceFill:"none",fillColor:"#d8e5e7",items:[],selected:null};
+// Resource limits prevent a large imported project from exhausting browser memory.
+const MAX_IMAGES=24,MAX_IMAGE_BYTES=12*1024*1024,MAX_IMAGE_PIXELS=16e6,
+ MAX_TOTAL_PIXELS=64e6,MAX_PROJECT_BYTES=80*1024*1024;
+const IMAGE_MIME=['image/png','image/jpeg','image/webp'];
+function imageSignature(bytes){
+ const b=bytes;
+ if(b.length>=8&&[137,80,78,71,13,10,26,10].every((x,i)=>b[i]===x))return 'image/png';
+ if(b.length>=3&&b[0]===255&&b[1]===216&&b[2]===255)return 'image/jpeg';
+ if(b.length>=12&&[82,73,70,70].every((x,i)=>b[i]===x)
+  &&[87,69,66,80].every((x,i)=>b[i+8]===x))return 'image/webp';
+ return null;
+}
+async function fileSignature(file){
+ return imageSignature(new Uint8Array(await file.slice(0,16).arrayBuffer()));
+}
+function projectImageSignature(dataUrl){
+ const comma=dataUrl.indexOf(',');
+ if(comma<0)return null;
+ try{return imageSignature(Uint8Array.from(atob(dataUrl.slice(comma+1,comma+33)),c=>c.charCodeAt(0)))}catch{return null}
+}
+function imagePixels(item){return item.image.naturalWidth*item.image.naturalHeight}
+function totalPixels(items){return items.reduce((total,item)=>total+imagePixels(item),0)}
+function disposeDesign(item){
+ if(item.feathered){item.feathered.width=0;item.feathered.height=0;item.feathered=null}
+ if(item.url?.startsWith('blob:'))URL.revokeObjectURL(item.url);
+ if(item.image)item.image.removeAttribute('src');
+}
 let nextId=1;
 function active(){return state.items.find(i=>i.id===state.selected)||null}
 function saveActive(){const i=active();if(i)Object.assign(i,{zoom:state.zoom,x:state.x,y:state.y,blur:state.blur,faceFill:state.faceFill,fillColor:state.fillColor})}
@@ -199,7 +226,7 @@ function removeDesign(id){
   if(state.items.length)selectDesign(state.items[Math.min(idx,state.items.length-1)].id);
   else{renderDesigns();draw()}
  }else{renderDesigns();updateSheet()}
- if(item.feathered){item.feathered.width=0;item.feathered.height=0}if(item.url.startsWith('blob:'))URL.revokeObjectURL(item.url);
+ disposeDesign(item);
  updateSheetToggle();
 }
 const center=350,maxRadius=275;let pointer=null;
@@ -315,15 +342,16 @@ el('file').addEventListener('change',async e=>{
  const files=Array.from(e.target.files||[]);
  let added=0,rejected=0,lastId=null;
  for(const file of files){
-  if(state.items.length>=60){rejected++;continue}
-  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>25*1024*1024){rejected++;continue}
+  if(state.items.length>=MAX_IMAGES){rejected++;continue}
+  if(!IMAGE_MIME.includes(file.type)||file.size>MAX_IMAGE_BYTES||file.size===0){rejected++;continue}
+  if(await fileSignature(file)!==file.type){rejected++;continue}
   const url=URL.createObjectURL(file),img=new Image();
   try{
    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
-   if(img.naturalWidth*img.naturalHeight>40e6)throw Error('Слишком большое изображение');
+   if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>MAX_IMAGE_PIXELS||totalPixels(state.items)+img.naturalWidth*img.naturalHeight>MAX_TOTAL_PIXELS)throw Error('Превышен лимит размера изображений');
    const item={id:nextId++,name:file.name,image:img,url,zoom:1,x:0,y:0,blur:true,faceFill:"none",fillColor:"#d8e5e7",copies:1};
    item.feathered=featherImage(img);state.items.push(item);lastId=item.id;added++;
-  }catch(err){URL.revokeObjectURL(url);rejected++}
+  }catch(err){img.removeAttribute('src');URL.revokeObjectURL(url);rejected++}
  }
  e.target.value='';
  if(lastId!==null)selectDesign(lastId);
@@ -397,7 +425,8 @@ function loadImage(url){
 function validateSavedItem(item){
  if(!item||typeof item!=='object'||typeof item.image!=='string'||!/^data:image\/(png|jpeg|webp);base64,/.test(item.image))
   throw Error('В проекте отсутствует подходящее изображение');
- if(item.image.length>38e6)throw Error('Слишком большое изображение в проекте');
+ if(item.image.length>Math.ceil(MAX_IMAGE_BYTES*4/3)+64)throw Error('Слишком большое изображение в проекте');
+ if(projectImageSignature(item.image)!==item.image.slice(5,item.image.indexOf(';')))throw Error('Неверный формат изображения в проекте');
  if(typeof item.name!=='string'||item.name.length>300)throw Error('Неверное имя изображения');
  for(const k of ['zoom','x','y','copies'])if(typeof item[k]!=='number'||!Number.isFinite(item[k]))throw Error('Повреждены настройки изображения');
  if(item.zoom<.5||item.zoom>3||Math.abs(item.x)>20000||Math.abs(item.y)>20000||item.copies<0||item.copies>200||!Number.isInteger(item.copies))
@@ -429,33 +458,38 @@ async function saveProject(){
 async function openProject(file){
  if(!file)return;
  const status=el('status');const input=el('openProject');
+ const loaded=[];let committed=false;
  if(state.items.length&&!window.confirm('Открытие проекта заменит текущие макеты. Если они нужны, сначала сохрани проект. Продолжить?')){input.value='';return}
  try{
-  if(file.size>150*1024*1024)throw Error('Файл проекта слишком большой (более 150 МБ)');
+  if(file.size>MAX_PROJECT_BYTES)throw Error('Файл проекта слишком большой (более 80 МБ)');
   const data=JSON.parse(await file.text());
   if(data?.format!==PROJECT_FORMAT||data.version!==PROJECT_VERSION)throw Error('Неизвестный формат или версия проекта');
-  if(!Object.hasOwn(presets,data.type)||!Array.isArray(data.items)||data.items.length>60||!data.items.length)
+  if(!Object.hasOwn(presets,data.type)||!Array.isArray(data.items)||data.items.length>MAX_IMAGES||!data.items.length)
    throw Error('Неверный размер значка или список макетов');
   if(!Number.isInteger(data.selected)||data.selected<0||data.selected>=data.items.length||typeof data.grid!=='boolean')
    throw Error('Повреждены настройки проекта');
-  const loaded=[];
+  // Reject the complete project before allocating decoded images.
+  let embeddedBytes=0;
+  for(const record of data.items){
+   validateSavedItem(record);embeddedBytes+=record.image.length;
+   if(embeddedBytes>MAX_PROJECT_BYTES)throw Error('Слишком большой суммарный объём изображений');
+  }
   for(const record of data.items){
    validateSavedItem(record);
    const image=await loadImage(record.image);
-   if(image.naturalWidth*image.naturalHeight>40e6)throw Error('Слишком большое изображение');
+   if(!image.naturalWidth||!image.naturalHeight||image.naturalWidth*image.naturalHeight>MAX_IMAGE_PIXELS||totalPixels(loaded)+image.naturalWidth*image.naturalHeight>MAX_TOTAL_PIXELS){image.removeAttribute('src');throw Error('Превышен лимит размера изображений')}
    loaded.push({id:nextId++,name:record.name,image,url:record.image,
     zoom:record.zoom,x:record.x,y:record.y,blur:record.blur,faceFill:record.faceFill,
     fillColor:record.fillColor,copies:record.copies,feathered:featherImage(image)});
   }
   // Commit only after all files and settings have been validated and loaded.
   const previous=state.items;
-  state.items=loaded;state.selected=null;state.image=null;state.url=null;
+  state.items=loaded;committed=true;state.selected=null;state.image=null;state.url=null;
   state.type=data.type;state.grid=data.grid;el('size').value=data.type;el('grid').checked=data.grid;
   selectDesign(loaded[data.selected].id);
-  for(const item of previous){if(item.feathered){item.feathered.width=0;item.feathered.height=0}
-   if(item.url.startsWith('blob:'))URL.revokeObjectURL(item.url)}
+  for(const item of previous)disposeDesign(item);
   status.textContent='Проект открыт: '+loaded.length+' макетов. Можно продолжить работу.';
- }catch(e){status.textContent='Не удалось открыть проект: '+e.message}
+ }catch(e){if(!committed)for(const item of loaded)disposeDesign(item);status.textContent='Не удалось открыть проект: '+e.message}
  finally{input.value=''}
 }
 el('saveProject').addEventListener('click',saveProject);
