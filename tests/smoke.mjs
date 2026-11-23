@@ -41,7 +41,7 @@ const tools=vm.runInNewContext(
   script.slice(slotStart,slotEnd)+';({clampCopies,copies,slots})',
   {state:{items:[{id:1,copies:2},{id:2,copies:1},{id:3,copies:3}]}}
 );
-assert.equal(tools.clampCopies(0),1);
+assert.equal(tools.clampCopies(0),0);
 assert.equal(tools.clampCopies(999),200);
 assert.equal(tools.copies(),6);
 assert.deepEqual(Array.from(tools.slots(),i=>i.id),[1,1,2,3,3,3]);
@@ -60,3 +60,66 @@ assert.match(script,/item\.feathered=featherImage\(img\)/);
 assert.match(script,/img\.naturalWidth\|\|img\.width/);
 assert.match(script,/item\.faceFill!=='none'/);
 console.log('OK: feathered edges and image/canvas dimensions');
+
+assert.match(html,/class="workspace-grid"/);
+for(const panel of ['designs-panel','editor-panel','paper-panel'])assert.match(html,new RegExp('class="panel '+panel+'"'));
+assert.equal((html.match(/id="preview"/g)||[]).length,1);
+assert.equal((html.match(/id="sheet"/g)||[]).length,1);
+assert.equal((html.match(/id="size"/g)||[]).length,1);
+assert.match(script,/function sheetCaption\(/);
+assert.match(script,/c\.fillText\(sheetCaption\(\),p\.margin\*mm,289\*mm\)/);
+const caption=vm.runInNewContext(
+  script.slice(script.indexOf('function sheetCaption()'),script.indexOf('function renderSheet(',script.indexOf('function sheetCaption()')))+';sheetCaption',
+  {state:{type:'m37'},presets:{m37:{face:37,paper:48.5},plastic:{face:33,paper:33}}}
+);
+assert.match(caption(),/37 мм/);
+assert.match(caption(),/48,5 мм/);
+console.log('OK: three-panel workspace, unique controls, and A4 size caption');
+
+assert.match(html,/class="add-image-button"/);
+assert.match(html,/Добавить ещё изображение/);
+assert.match(html,/id="file"[^>]*multiple/);
+assert.match(script,/state\.items\.push\(item\)/);
+console.log('OK: additive image upload clearly labeled');
+
+assert.match(html,/id="saveProject"/);
+assert.match(html,/id="openProject"/);
+assert.match(html,/id="sheetToggle"/);
+assert.match(html,/id="copies" min="0"/);
+for(const name of ['saveProject','openProject','validateSavedItem','fileToDataURL','loadImage','updateSheetToggle'])assert.match(script,new RegExp('function '+name+'\\('));
+assert.match(script,/i\.copies=0/);
+assert.match(script,/state\.items=loaded/);
+assert.match(script,/format:PROJECT_FORMAT,version:PROJECT_VERSION/);
+assert.match(script,/image:encoded/);
+const securitySandbox={Uint8Array,atob};
+const validate=vm.runInNewContext(script.slice(script.indexOf('// Resource limits'),script.indexOf('let nextId=1;'))+'\n'+script.slice(script.indexOf('function validateSavedItem'),script.indexOf('async function saveProject'))+';validateSavedItem',securitySandbox);
+const valid={name:'test.png',image:'data:image/png;base64,'+Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]).toString('base64'),zoom:1,x:0,y:0,copies:0,blur:true,faceFill:'none',fillColor:'#ffffff'};
+assert.doesNotThrow(()=>validate(valid));
+assert.throws(()=>validate({...valid,image:'https://host.example/a.png'}));
+assert.throws(()=>validate({...valid,copies:-1}));
+assert.throws(()=>validate({...valid,zoom:Infinity}));
+assert.throws(()=>validate({...valid,fillColor:'red'}));
+assert.throws(()=>validate({...valid,faceFill:'script'}));
+console.log('OK: save/open project format, validation, and 0-copy sheet removal');
+
+assert.match(html,/http-equiv="Content-Security-Policy"/);
+assert.match(html,/connect-src blob:/);
+assert.match(script,/MAX_IMAGES=24/);
+assert.match(script,/MAX_IMAGE_PIXELS=16e6/);
+assert.match(script,/MAX_TOTAL_PIXELS=64e6/);
+assert.match(script,/function imageSignature\(/);
+assert.match(script,/function projectImageSignature\(/);
+assert.match(script,/if\(!committed\)for\(const item of loaded\)disposeDesign\(item\)/);
+assert.match(script,/fileSignature\(file\)!==file.type/);
+assert.match(script,/totalPixels\(loaded\)/);
+const sig=vm.runInNewContext(script.slice(script.indexOf('function imageSignature'),script.indexOf('function imagePixels'))+';({imageSignature,projectImageSignature})',{Uint8Array,atob});
+const png=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,0]);
+const jpeg=Uint8Array.from([255,216,255,224,0,0]);
+const webp=Uint8Array.from([82,73,70,70,0,0,0,0,87,69,66,80]);
+assert.equal(sig.imageSignature(png),'image/png');
+assert.equal(sig.imageSignature(jpeg),'image/jpeg');
+assert.equal(sig.imageSignature(webp),'image/webp');
+assert.equal(sig.imageSignature(new Uint8Array([60,115,118,103,62])),null);
+assert.equal(sig.projectImageSignature('data:image/png;base64,'+Buffer.from(png).toString('base64')),'image/png');
+assert.equal(sig.projectImageSignature('data:image/png;base64,'+Buffer.from(jpeg).toString('base64')),'image/jpeg');
+console.log('OK: signatures, CSP, resource budgets, and failed-import rollback');
