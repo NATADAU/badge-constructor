@@ -118,6 +118,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="workspace-grid">
 <section class="panel designs-panel"><h2>Мои макеты</h2><label for="file" class="add-image-button"><span class="add-symbol" aria-hidden="true">＋</span><span>Добавить ещё изображение<small>JPG, PNG или WebP · можно несколько</small></span></label><input id="file" class="visually-hidden-file" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Добавить ещё изображение">
 <label for="designs">Мои макеты</label>
+<p class="small note" id="designCount" aria-live="polite">Макетов: 0 из 60</p>
 <div id="designs" class="designs" aria-label="Загруженные макеты"><p class="small note">Пока нет рисунков.</p></div>
 <label for="copies">Копий выбранного рисунка на А4</label><input type="number" id="copies" min="0" max="200" value="1">
 <button type="button" id="sheetToggle">Убрать выбранный рисунок с листа</button>
@@ -164,7 +165,7 @@ const presets={plastic:{paper:33,face:33},m25:{paper:35,face:25},m37:{paper:48.5
 const el=id=>document.getElementById(id),cv=el('preview'),ctx=cv.getContext('2d');
 const state={type:'plastic',image:null,zoom:1,x:0,y:0,url:null,blur:true,grid:false,faceFill:"none",fillColor:"#d8e5e7",items:[],selected:null};
 // Resource limits prevent a large imported project from exhausting browser memory.
-const MAX_IMAGES=24,MAX_IMAGE_BYTES=12*1024*1024,MAX_IMAGE_PIXELS=16e6,
+const MAX_IMAGES=60,MAX_IMAGE_BYTES=12*1024*1024,MAX_IMAGE_PIXELS=16e6,
  MAX_TOTAL_PIXELS=64e6,MAX_PROJECT_BYTES=80*1024*1024;
 const IMAGE_MIME=['image/png','image/jpeg','image/webp'];
 function imageSignature(bytes){
@@ -202,6 +203,7 @@ function selectDesign(id){
  renderDesigns();draw();
 }
 function renderDesigns(){
+ el('designCount').textContent='Макетов: '+state.items.length+' из '+MAX_IMAGES+' (разных рисунков)';
  const parent=el('designs');parent.replaceChildren();
  if(!state.items.length){const p=document.createElement('p');p.className='small note';p.textContent='Пока нет рисунков.';parent.append(p);return}
  for(const item of state.items){
@@ -340,23 +342,24 @@ document.addEventListener('keydown',e=>{
 });
 el('file').addEventListener('change',async e=>{
  const files=Array.from(e.target.files||[]);
- let added=0,rejected=0,lastId=null;
+ let added=0,rejected=0,lastId=null,reason='';
  for(const file of files){
-  if(state.items.length>=MAX_IMAGES){rejected++;continue}
-  if(!IMAGE_MIME.includes(file.type)||file.size>MAX_IMAGE_BYTES||file.size===0){rejected++;continue}
-  if(await fileSignature(file)!==file.type){rejected++;continue}
+  if(state.items.length>=MAX_IMAGES){rejected++;reason='Достигнут предел '+MAX_IMAGES+' разных макетов';continue}
+  if(!IMAGE_MIME.includes(file.type)||file.size>MAX_IMAGE_BYTES||file.size===0){rejected++;reason='Неподдерживаемый формат или размер файла больше 12 МБ';continue}
+  if(await fileSignature(file)!==file.type){rejected++;reason='Содержимое файла не соответствует формату';continue}
   const url=URL.createObjectURL(file),img=new Image();
   try{
    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
-   if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>MAX_IMAGE_PIXELS||totalPixels(state.items)+img.naturalWidth*img.naturalHeight>MAX_TOTAL_PIXELS)throw Error('Превышен лимит размера изображений');
+   if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>MAX_IMAGE_PIXELS)throw Error('Слишком большое изображение (свыше 16 млн пикселей)');
+   if(totalPixels(state.items)+img.naturalWidth*img.naturalHeight>MAX_TOTAL_PIXELS)throw Error('Превышен общий лимит памяти изображений');
    const item={id:nextId++,name:file.name,image:img,url,zoom:1,x:0,y:0,blur:true,faceFill:"none",fillColor:"#d8e5e7",copies:1};
    item.feathered=featherImage(img);state.items.push(item);lastId=item.id;added++;
-  }catch(err){img.removeAttribute('src');URL.revokeObjectURL(url);rejected++}
+  }catch(err){img.removeAttribute('src');URL.revokeObjectURL(url);rejected++;reason=err.message}
  }
  e.target.value='';
  if(lastId!==null)selectDesign(lastId);
  else {renderDesigns();updateSheet()}
- el('status').textContent='Добавлено рисунков: '+added+(rejected?'. Пропущено: '+rejected:'')+'.';
+ el('status').textContent='Добавлено рисунков: '+added+(rejected?'. Пропущено: '+rejected+'. Причина: '+reason:'')+'.';
 });
 function point(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}}
 cv.addEventListener('pointerdown',e=>{if(!state.image)return;const p=point(e);pointer={id:e.pointerId,x:p.x,y:p.y,oldX:state.x,oldY:state.y};cv.setPointerCapture(e.pointerId);cv.classList.add('dragging')});
