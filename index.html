@@ -429,6 +429,7 @@ async function saveProject(){
 async function openProject(file){
  if(!file)return;
  const status=el('status');const input=el('openProject');
+ if(state.items.length&&!window.confirm('Открытие проекта заменит текущие макеты. Если они нужны, сначала сохрани проект. Продолжить?')){input.value='';return}
  try{
   if(file.size>150*1024*1024)throw Error('Файл проекта слишком большой (более 150 МБ)');
   const data=JSON.parse(await file.text());
