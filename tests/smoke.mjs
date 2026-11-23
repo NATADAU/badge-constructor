@@ -75,3 +75,9 @@ const caption=vm.runInNewContext(
 assert.match(caption(),/37 мм/);
 assert.match(caption(),/48,5 мм/);
 console.log('OK: three-panel workspace, unique controls, and A4 size caption');
+
+assert.match(html,/class="add-image-button"/);
+assert.match(html,/Добавить ещё изображение/);
+assert.match(html,/id="file"[^>]*multiple/);
+assert.match(script,/state\.items\.push\(item\)/);
+console.log('OK: additive image upload clearly labeled');
