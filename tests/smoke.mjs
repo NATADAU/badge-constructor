@@ -104,7 +104,9 @@ console.log('OK: save/open project format, validation, and 0-copy sheet removal'
 
 assert.match(html,/http-equiv="Content-Security-Policy"/);
 assert.match(html,/connect-src blob:/);
-assert.match(script,/MAX_IMAGES=24/);
+assert.match(script,/MAX_IMAGES=60/);
+assert.match(html,/id="designCount"/);
+assert.match(script,/Превышен общий лимит памяти изображений/);
 assert.match(script,/MAX_IMAGE_PIXELS=16e6/);
 assert.match(script,/MAX_TOTAL_PIXELS=64e6/);
 assert.match(script,/function imageSignature\(/);

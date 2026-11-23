@@ -96,6 +96,22 @@ try{
  assert.equal(pdf.subarray(0,8).toString(),'%PDF-1.4');
  assert.match(pdf.toString('latin1'),/\/MediaBox \[0 0 595\.27559 841\.88976\]/);
  assert.match(pdf.toString('latin1'),/\/Count 1\b/);
+ // Regression: a 33 mm A4 sheet holds 35 DIFFERENT pictures, not just copies.
+ await page.locator('#size').selectOption('plastic');
+ await page.locator('#copies').fill('1');
+ await page.locator('#copies').dispatchEvent('change');
+ const more=Array.from({length:33},(_,i)=>({name:'extra-'+(i+1)+'.png',mimeType:'image/png',buffer:png}));
+ await page.locator('#file').setInputFiles(more);
+ await page.waitForFunction(()=>document.querySelectorAll('.design-row').length===35);
+ assert.equal(await page.locator('.design-row').count(),35);
+ assert.match(await page.locator('#designCount').innerText(),/35 из 60/);
+ assert.match(await page.locator('#sheetInfo').innerText(),/всего значков: 35/);
+ assert.match(await page.locator('#sheetInfo').innerText(),/листов: 1/);
+ downloadPromise=page.waitForEvent('download');
+ await page.locator('#download').click();
+ const fullSheet=readFileSync(await (await downloadPromise).path());
+ assert.match(fullSheet.toString('latin1'),/\\/Count 1\\b/);
+ console.log('BROWSER PASS: 35 different 33 mm designs fill one A4 sheet');
  assert.equal(external.length,0,'No outside network requests: '+external.join(', '));
  assert.deepEqual(errors,[],'Page errors: '+errors.join('; '));
  console.log('BROWSER PASS: uploads, selection, sheet removal, full project save/open/re-save, invalid JSON, MIME spoofing, A4 PDF, CSP and no external requests');

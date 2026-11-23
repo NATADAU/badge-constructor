@@ -1,7 +1,7 @@
 name: Badge prototype tests
 on:
   push:
-    branches: [main, feature/a4-pdf, feature/editor-controls, feature/multiple-designs, feature/fill-empty-edges, fix/soft-image-edges, feature/compact-workspace-sheet-label, feature/clear-add-image-button, feature/project-save-and-sheet-remove, security/file-validation-and-memory-limits]
+    branches: [main, feature/a4-pdf, feature/editor-controls, feature/multiple-designs, feature/fill-empty-edges, fix/soft-image-edges, feature/compact-workspace-sheet-label, feature/clear-add-image-button, feature/project-save-and-sheet-remove, security/file-validation-and-memory-limits, fix/more-distinct-badges]
   pull_request:
 jobs:
   test:
