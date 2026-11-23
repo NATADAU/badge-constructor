@@ -175,8 +175,9 @@ function paintBadge(c,x,y,r,item,outline=false){
  if(item?.image){
   function image(radius,scale,dx=0,dy=0,blur=0,soft=false){
    const img=soft&&item.feathered?item.feathered:item.image;
-   const fit=Math.max(2*radius/img.naturalWidth,2*radius/img.naturalHeight);
-   const w=img.naturalWidth*fit*scale,h=img.naturalHeight*fit*scale;
+   const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+   const fit=Math.max(2*radius/iw,2*radius/ih);
+   const w=iw*fit*scale,h=ih*fit*scale;
    c.save();if(blur)c.filter='blur('+blur+'px)';
    c.drawImage(img,x-w/2+dx,y-h/2+dy,w,h);c.restore();
   }
